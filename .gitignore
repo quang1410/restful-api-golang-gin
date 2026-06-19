@@ -1,0 +1,6 @@
+# Compiled binaries
+Golang-basic/golang-basic
+
+# Go build artifacts
+*.exe
+*.out
