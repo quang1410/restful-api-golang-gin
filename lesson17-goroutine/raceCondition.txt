@@ -1,0 +1,23 @@
+package main
+
+import "sync"
+
+func main() {
+	token := 0
+	var wg sync.WaitGroup
+	var m sync.Mutex
+
+
+	for i := 0; i < 10000; i++ {
+		wg.Add(1)
+		go func() {
+			wg.Done()
+			m.Lock()
+			token++
+			m.Unlock()
+		}()
+	}
+
+	wg.Wait()
+	println(token)
+}

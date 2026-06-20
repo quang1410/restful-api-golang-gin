@@ -1,0 +1,52 @@
+package main
+
+import (
+	"fmt"
+	"sync"
+	"time"
+)
+
+func task(id int,ch chan<- int,wg *sync.WaitGroup) {
+	defer wg.Done()
+	fmt.Printf("Task %d was started \n", id)
+	time.Sleep(1*time.Second)
+	fmt.Printf("Task %d was completed \n", id)
+	ch <- id
+}
+
+func main() {
+	ch := make(chan int)
+	var wg sync.WaitGroup
+
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go task(i, ch, &wg)
+	}
+
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
+
+	// for i := 0; i < 5; i++ {
+	// 	ch <- i
+	// }
+
+	// go func() {
+	// 	defer close(ch)
+	// 	for i := 0; i < 5; i++ {
+	// 		ch <- i
+	// 	}
+	// }()
+
+	// for i := 0; i < 5; i++ {
+	// 	num := <-ch
+	// 	fmt.Println(num)
+	// }
+
+	// Hoặc sử dụng range để đọc từ channel cho đến khi nó bị đóng
+
+	for num := range ch {
+		fmt.Println(num)
+	}
+}

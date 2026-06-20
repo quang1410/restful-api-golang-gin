@@ -1,0 +1,32 @@
+package main
+
+import (
+	"fmt"
+)
+
+func main() {
+	ch := make(chan int, 5)
+
+	for i := 0; i < 5; i++ {
+		ch <- i
+	}
+	close(ch)
+
+	// go func() {
+	// 	defer close(ch)
+	// 	for i := 0; i < 5; i++ {
+	// 		ch <- i
+	// 	}
+	// }()
+
+	// for i := 0; i < 5; i++ {
+	// 	num := <-ch
+	// 	fmt.Println(num)
+	// }
+
+	// Hoặc sử dụng range để đọc từ channel cho đến khi nó bị đóng
+
+	for num := range ch {
+		fmt.Println(num)
+	}
+}
