@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 )
 
 func HandleValidationErrors(err error) gin.H {
@@ -138,4 +139,60 @@ func RegisterValidators() error {
 	})
 
 	return nil
+}
+
+func ValidationRequired(field, value string) error {
+	if value == "" {
+		return fmt.Errorf("%s is required", field)
+	}
+	return nil
+}
+
+func ValidationStringLength(field, value string, min, max int) error {
+	length := len(value)
+	if length < min || length > max {
+		return fmt.Errorf("%s must be between %d and %d characters long", field, min, max)
+	}
+	return nil
+}
+
+func ValidationRegex(field, value string, re *regexp.Regexp, errorMessage string) error {
+	if !re.MatchString(value) {
+		return fmt.Errorf("%s: %s", field, errorMessage)
+	}
+	return nil
+}
+
+func ValidationPositiveInt(field, value string) (int, error) {
+	val, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be a valid integer", field)
+	}
+	if val <= 0 {
+		return 0, fmt.Errorf("%s must be a positive integer", field)
+	}
+	return val, nil
+}
+
+func ValidationUUID(field, value string) (uuid.UUID, error) {
+	uid, err := uuid.Parse(value)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("%s must be a valid UUID", field)
+	}
+	return uid,nil
+}
+
+func ValidationInList(field, value string, allowed map[string]bool) error {
+	if !allowed[value] {
+		return fmt.Errorf("%s must be one of the following values: %s", field, keys(allowed))
+	}
+	return nil
+}
+
+func keys(m map[string]bool) string {
+	var keys []string
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return strings.Join(keys, ", ")
 }

@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"log"
 	"net/http"
 
 	"galvin/golang-gin/utils"
@@ -25,24 +24,42 @@ func NewCategoryHandler() *CategoryHandler {
 	return &CategoryHandler{}
 }
 
+var validCategory = map[string]bool{
+	"php":    true,
+	"python": true,
+	"golang": true,
+}
+
 func (c *CategoryHandler) GetCategoryByCategoryV1(ctx *gin.Context) {
-	var params GetCategoryByCategoryV1Param
-	if err := ctx.ShouldBindUri(&params); err != nil {
-		ctx.JSON(http.StatusBadRequest, utils.HandleValidationErrors(err))
+	// var params GetCategoryByCategoryV1Param
+	// if err := ctx.ShouldBindUri(&params); err != nil {
+	// 	ctx.JSON(http.StatusBadRequest, utils.HandleValidationErrors(err))
+	// 	return
+	// }
+
+	// log.Println("Into GetCategoryByCategoryV1")
+
+	// value, exist := ctx.Get("username")
+	// if !exist {
+	// 	ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Missing username"})
+	// }
+
+	// ctx.JSON(http.StatusOK, gin.H{
+	// 	"message": "Get category by category (V1)",
+	// 	"course":  params.Category,
+	// 	"username": value,
+	// })
+
+	category := ctx.Param("category")
+
+	if err := utils.ValidationInList("Category", category, validCategory); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	log.Println("Into GetCategoryByCategoryV1")
-
-	value, exist := ctx.Get("username")
-	if !exist {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Missing username"})
-	}
-
 	ctx.JSON(http.StatusOK, gin.H{
-		"message": "Get category by category (V1)",
-		"course":  params.Category,
-		"username": value,
+		"message":  "Get category by category (V1)",
+		"category": category,
 	})
 }
 

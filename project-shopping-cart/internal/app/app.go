@@ -7,7 +7,6 @@ import (
 	"project-shopping-cart/internal/validation"
 
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 )
 
 type Module interface {
@@ -24,8 +23,6 @@ func NewApplication(cfg *config.Config) *Application {
 	if err := validation.InitValidator(); err != nil {
 		log.Fatalf("Validator init failed %v", err)
 	}
-
-	loadEnv()
 
 	r := gin.Default()
 
@@ -53,11 +50,4 @@ func getModulRoutes(modules []Module) []routes.Route {
 	}
 
 	return routeList
-}
-
-func loadEnv() {
-	err := godotenv.Load("../../.env")
-	if err != nil {
-		log.Println("No .env file found")
-	}
 }

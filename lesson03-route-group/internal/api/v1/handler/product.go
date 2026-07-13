@@ -3,6 +3,8 @@ package handler
 import (
 	"fmt"
 	"net/http"
+	"regexp"
+	"strconv"
 	"time"
 
 	"galvin/golang-gin/utils"
@@ -56,43 +58,109 @@ func NewProductHandler() *ProductHandler {
 }
 
 func (u *ProductHandler) GetProductsV1(ctx *gin.Context) {
-	var params GetProductsV1Param
-	if err := ctx.ShouldBindQuery(&params); err != nil {
-		ctx.JSON(http.StatusBadRequest, utils.HandleValidationErrors(err))
+	// var params GetProductsV1Param
+	// if err := ctx.ShouldBindQuery(&params); err != nil {
+	// 	ctx.JSON(http.StatusBadRequest, utils.HandleValidationErrors(err))
+	// 	return
+	// }
+
+	// if params.Limit == 0 {
+	// 	params.Limit = 1
+	// }
+
+	// if params.Email == "" {
+	// 	params.Email = "No Email"
+	// }
+
+	// if params.Date == "" {
+	// 	params.Date = time.Now().Format("2006-01-02")
+	// }
+
+	// ctx.JSON(http.StatusOK, gin.H{
+	// 	"message": "List all products (V1)",
+	// 	"search":  params.Search,
+	// 	"limit":   params.Limit,
+	// 	"email":   params.Email,
+	// 	"date":    params.Date,
+	// })
+	searchRegex := regexp.MustCompile(`^[a-zA-Z0-9]+$`)
+	search := ctx.Query("search")
+
+	if err := utils.ValidationRequired("Search", search); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if params.Limit == 0 {
-		params.Limit = 1
+	if err := utils.ValidationStringLength("Search", search, 3, 50); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
-	if params.Email == "" {
-		params.Email = "No Email"
+	if err := utils.ValidationRegex("Search", search, searchRegex, "Invalid search format"); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
-	if params.Date == "" {
-		params.Date = time.Now().Format("2006-01-02")
+	limitStr := ctx.DefaultQuery("limit", "1")
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit < 1 || limit > 100 {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Limit must be between 1 and 100"})
+		return
+	}
+	
+	email := ctx.DefaultQuery("email", "No Email")
+	if email != "No Email" && !regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`).MatchString(email) {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid email format"})
+		return
 	}
 
+	date := ctx.DefaultQuery("date", time.Now().Format("2006-01-02"))
+	if _, err := time.Parse("2006-01-02", date); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid date format"})
+		return
+	}
+ 
 	ctx.JSON(http.StatusOK, gin.H{
 		"message": "List all products (V1)",
-		"search":  params.Search,
-		"limit":   params.Limit,
-		"email":   params.Email,
-		"date":    params.Date,
+		"search":  search,
+		"limit":   limit,
+		"email":   email,
+		"date":    date,
 	})
 }
 
 func (u *ProductHandler) GetProductsBySlugV1(ctx *gin.Context) {
-	var params GetProductsBySlugV1Param
-	if err := ctx.ShouldBindUri(&params); err != nil {
-		ctx.JSON(http.StatusBadRequest, utils.HandleValidationErrors(err))
+	// var params GetProductsBySlugV1Param
+	// if err := ctx.ShouldBindUri(&params); err != nil {
+	// 	ctx.JSON(http.StatusBadRequest, utils.HandleValidationErrors(err))
+	// 	return
+	// }
+
+	// ctx.JSON(http.StatusCreated, gin.H{
+	// 	"message": "Get product by Slug (V1)",
+	// 	"slug":    params.Slug,
+	// })
+	slug := ctx.Param("slug")
+	slugRegex := regexp.MustCompile(`^[a-z0-9]+(?:[-.] [a-z0-9]+)*$`)
+
+	if err := utils.ValidationRequired("Slug", slug); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, gin.H{
+	if err := utils.ValidationStringLength("Slug", slug, 3, 5); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := utils.ValidationRegex("Slug", slug, slugRegex, "Invalid slug format"); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
 		"message": "Get product by Slug (V1)",
-		"slug":    params.Slug,
+		"slug":    slug,
 	})
 }
 

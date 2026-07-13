@@ -1,10 +1,9 @@
 package handler
 
 import (
+	"galvin/golang-gin/utils"
 	"log"
 	"net/http"
-
-	"galvin/golang-gin/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -41,18 +40,42 @@ func (u *UserHandler) GetUsersByIdV1(ctx *gin.Context) {
 		"message": "Get user by ID (V1)",
 		"user_id": params.ID,
 	})
+	// idStr := ctx.Param("id")
+
+	// id, err := utils.ValidationPositiveInt("Id", idStr)
+	// if err != nil {
+	// 	ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	// 	return
+	// }
+
+	// ctx.JSON(http.StatusOK, gin.H{
+	// 	"message": "Get user by ID (V1)",
+	// 	"user_id": id,
+	// })
 }
 
 func (u *UserHandler) GetUsersByUuidV1(ctx *gin.Context) {
-	var params GetUsersByUuidV1Param
-	if err := ctx.ShouldBindUri(&params); err != nil {
-		ctx.JSON(http.StatusBadRequest, utils.HandleValidationErrors(err))
+	// var params GetUsersByUuidV1Param
+	// if err := ctx.ShouldBindUri(&params); err != nil {
+	// 	ctx.JSON(http.StatusBadRequest, utils.HandleValidationErrors(err))
+	// 	return
+	// }
+
+	// ctx.JSON(http.StatusOK, gin.H{
+	// 	"message":   "Get user by UUID (V1)",
+	// 	"user_uuid": params.Uuid,
+	// })
+	uuidStr := ctx.Param("uuid")
+
+	uid, err := utils.ValidationUUID("Uuid", uuidStr)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"message":   "Get user by UUID (V1)",
-		"user_uuid": params.Uuid,
+		"user_uuid": uid,
 	})
 }
 
