@@ -14,27 +14,44 @@ import (
 )
 
 func HandleValidationErrors(err error) gin.H {
+	// Type assertion: the validator library returns errors as the interface `error`,
+	// but the concrete type underneath is `validator.ValidationErrors` (a slice of
+	// per-field errors). `ok` is true only when the assertion matches, so we only
+	// enter this block for actual validation failures.
 	if validationError, ok := err.(validator.ValidationErrors); ok {
+		// Result map: field-path (snake_case) → human-readable Vietnamese message.
 		errors := make(map[string]string)
 
+		// Loop over each field error; `_` discards the slice index.
 		for _, e := range validationError {
+			// e.Namespace() is the full path incl. the struct name,
+			// e.g. "CreateNewsRequest.Author.FirstName". [0] → the root struct name.
 			root := strings.Split(e.Namespace(), ".")[0]
 
+			// Strip the root prefix (+ its dot) → "Author.FirstName".
 			rawPath := strings.TrimPrefix(e.Namespace(), root+".")
 
+			// Split the remaining path into segments → ["Author", "FirstName"].
 			parts := strings.Split(rawPath, ".")
 
+			// Convert each segment to snake_case; index `i` is needed to write back.
 			for i, part := range parts {
+				// A slice element looks like "Images[0]": snake_case only the name
+				// and keep the "[0]" suffix intact.
+				// NOTE: bug — "part" is quoted, so this checks a literal string and is
+				// always false. It should be strings.Contains(part, "[").
 				if strings.Contains("part", "[") {
-					idx := strings.Index(part, "[")
-					base := camelToSnake(part[:idx])
-					index := part[idx:]
-					parts[i] = base + index
+					idx := strings.Index(part, "[")   // position of '['
+					base := camelToSnake(part[:idx])  // name before '[' → snake_case
+					index := part[idx:]               // "[0]" kept as-is
+					parts[i] = base + index           // e.g. "images[0]"
 				} else {
+					// No brackets → snake_case the whole segment ("FirstName" → "first_name").
 					parts[i] = camelToSnake(part)
 				}
 			}
 
+			// Rejoin segments into a dotted path → "author.first_name".
 			fieldPath := strings.Join(parts, ".")
 
 			switch e.Tag() {
@@ -110,6 +127,7 @@ func RegisterValidators() error {
 
 	v.RegisterValidation("max_int", func(fl validator.FieldLevel) bool {
 		maxStr := fl.Param()
+		// 10 là cơ số, 64 là kích thước bit
 		maxVal, err := strconv.ParseInt(maxStr, 10, 64)
 		if err != nil {
 			return false
@@ -126,8 +144,28 @@ func RegisterValidators() error {
 			return false
 		}
 
-		allowedExt := strings.Fields(allowedStr)
+		allowedExt := strings.Fields(allowedStr) // "jpg png gif"  →  []string{"jpg", "png", "gif"}
+		// 1. filepath.Ext(filename) — returns the extension including the dot.
+		// "photo.JPG" → ".JPG"
+		// 2. strings.ToLower(...) — lowercases it so comparison is case-insensitive.
+		// ".JPG" → ".jpg"
+		// 3. strings.TrimPrefix(..., ".") — removes the leading "." (only if present).
+		// ".jpg" → "jpg"
 		ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(filename)), ".")
+
+		//The two forms of range
+
+		// for i, v := range slice { }  // i = index, v = value
+		// for _, v := range slice { }  // ignore index, only value  ← this code
+		// for i := range slice { }     // only index, no value
+
+		// Equivalent without range
+
+		// for i := 0; i < len(allowedExt); i++ {
+		//     if ext == strings.ToLower(allowedExt[i]) {
+		//         return true
+		//     }
+		// }
 
 		for _, allowed := range allowedExt {
 			if ext == strings.ToLower(allowed) {
@@ -179,7 +217,7 @@ func ValidationUUID(field, value string) (uuid.UUID, error) {
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("%s must be a valid UUID", field)
 	}
-	return uid,nil
+	return uid, nil
 }
 
 func ValidationInList(field, value string, allowed map[string]bool) error {
