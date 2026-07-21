@@ -21,6 +21,8 @@ var (
 
 func getClientIP(ctx *gin.Context) string {
 	ip := ctx.ClientIP()
+
+	//dùng khi client có proxy, load balancer, hoặc reverse proxy
 	if ip == "" {
 		ip = ctx.Request.RemoteAddr
 	}
