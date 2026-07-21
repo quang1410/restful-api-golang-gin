@@ -1,0 +1,46 @@
+root = "."
+testdata_dir = "testdata"
+tmp_dir = "tmp"
+
+[build]
+  # Build the whole package, not a single file
+  cmd = "go build -o ./tmp/main ./cmd/api"
+  entrypoint = "./tmp/main"
+  # Air runs the binary from the module root, so the relative paths
+  # for .env and internal/logs/http.log keep working.
+  full_bin = ""
+  args_bin = []
+
+  include_ext = ["go", "tpl", "tmpl", "html", "env"]
+  # internal/logs must be excluded: the logger writes on every request,
+  # which would trigger a rebuild -> new log write -> rebuild loop.
+  exclude_dir = ["assets", "bin", "tmp", "vendor", "testdata", "internal/logs"]
+  exclude_file = []
+  exclude_regex = ["_test\\.go"]
+  exclude_unchanged = true
+  follow_symlink = false
+
+  log = "build-errors.log"
+  delay = 1000
+  stop_on_error = true
+  send_interrupt = true
+  kill_delay = 2000
+  rerun = false
+  rerun_delay = 500
+
+[log]
+  time = false
+  main_only = false
+
+[color]
+  main = "magenta"
+  watcher = "cyan"
+  build = "yellow"
+  runner = "green"
+
+[misc]
+  clean_on_exit = true
+
+[screen]
+  clear_on_rebuild = false
+  keep_scroll = true

@@ -4,3 +4,4 @@ Golang-basic/golang-basic
 # Go build artifacts
 *.exe
 *.out
+bin/

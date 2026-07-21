@@ -1,0 +1,10 @@
+# Secrets
+.env
+
+# Build artifacts
+bin/
+tmp/
+
+# Runtime logs
+internal/logs/
+build-errors.log

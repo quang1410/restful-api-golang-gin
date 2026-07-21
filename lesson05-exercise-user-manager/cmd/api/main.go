@@ -1,36 +1,19 @@
 package main
 
 import (
+	"galvin/lession05-exercise-user-management/internal/app"
 	"galvin/lession05-exercise-user-management/internal/config"
-	"galvin/lession05-exercise-user-management/internal/handler"
-	"galvin/lession05-exercise-user-management/internal/repository"
-	"galvin/lession05-exercise-user-management/internal/routes"
-	"galvin/lession05-exercise-user-management/internal/service"
-
-	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	//initialize config
-	config := config.NewConfig()
+	// Initialize configuration
+	cfg := config.NewConfig()
 
-	//initialize repository
-	userRepo := repository.NewInMemoryUserRepository()
-	
-	//initialize service
-	userService := service.NewUserService(userRepo)	
+	// Initialize application
+	application := app.NewApplication(cfg)
 
-	//initialize handler
-	userHandler := handler.NewUserHandler(userService)
-	
-	//initialize routes
-	userRoutes := routes.NewUserRoutes(userHandler)
-
-	r := gin.Default()
-
-	routes.RegisterRoutes(r, userRoutes)
-
-	if err := r.Run(config.ServerAddress); err != nil {
+	// Start server
+	if err := application.Run(); err != nil {
 		panic(err)
 	}
 }

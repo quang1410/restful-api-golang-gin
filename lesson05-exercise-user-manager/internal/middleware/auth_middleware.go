@@ -3,8 +3,7 @@ package middleware
 import "github.com/gin-gonic/gin"
 
 func AuthMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// TODO: Implement authentication logic
-		c.Next()
+	return func(ctx *gin.Context) {
+		ctx.Next()
 	}
 }
