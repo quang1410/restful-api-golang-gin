@@ -1,18 +1,14 @@
 package service
 
 import (
-	"crypto/rand"
-	"encoding/hex"
-	"errors"
 	"strings"
 
 	"galvin/lession05-exercise-user-management/internal/models"
 	"galvin/lession05-exercise-user-management/internal/repository"
-)
+	"galvin/lession05-exercise-user-management/internal/utils"
 
-var (
-	ErrUserNotFound = errors.New("user not found")
-	ErrEmailExists  = errors.New("email already exists")
+	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type userService struct {
@@ -25,128 +21,130 @@ func NewUserService(repo repository.UserRepository) UserService {
 	}
 }
 
-func (s *userService) GetAllUsers(search string, page, limit int) ([]models.User, error) {
-	users, err := s.repo.FindAll()
+func (us *userService) GetAllUsers(search string, page, limit int) ([]models.User, error) {
+	users, err := us.repo.FindAll()
 	if err != nil {
-		return nil, err
+		return nil, utils.WrapError(err, "failed to fetch users", utils.ErrCodeInternal)
 	}
 
+	var filteredUsers []models.User
 	if search != "" {
-		keyword := strings.ToLower(search)
-		filtered := []models.User{}
+		search = strings.ToLower(search)
 		for _, user := range users {
-			if strings.Contains(strings.ToLower(user.Name), keyword) ||
-				strings.Contains(strings.ToLower(user.Email), keyword) {
-				filtered = append(filtered, user)
+			name := strings.ToLower(user.Name)
+			email := strings.ToLower(user.Email)
+
+			if strings.Contains(name, search) || strings.Contains(email, search) {
+				filteredUsers = append(filteredUsers, user)
 			}
 		}
-		users = filtered
+	} else {
+		filteredUsers = users
 	}
 
-	if page < 1 {
-		page = 1
-	}
-	if limit < 1 {
-		limit = 10
-	}
+	// --- Pagination algorithm ---
+	//
+	//   index:  0   1   2   3   4   5   6   7
+	//          [A] [B] [C] [D] [E] [F] [G] [H]   len = 8
+	//
+	//   start = (page - 1) * limit
+	//   end   = start + limit
+	//
+	//   With limit = 3:
+	//     page 1 -> start 0, end 3  -> A B C
+	//     page 2 -> start 3, end 6  -> D E F
+	//     page 3 -> start 6, end 9  -> G H     (end is clamped to 8)
+	//
+	// Note: `start` is inclusive, `end` is exclusive, which is exactly how
+	// a Go slice expression `s[start:end]` works.
 
+	// Page is out of range (e.g. page 5 when we only have 8 items).
+	// Return an empty page instead of panicking on the slice.
 	start := (page - 1) * limit
-	if start >= len(users) {
+	if start >= len(filteredUsers) {
 		return []models.User{}, nil
 	}
+
+	// The last page is usually not full, so clamp `end` to the real length.
+	// Without this, page 3 above would slice [6:9] and panic (out of range).
 	end := start + limit
-	if end > len(users) {
-		end = len(users)
+	if end > len(filteredUsers) {
+		end = len(filteredUsers)
 	}
 
-	return users[start:end], nil
+	return filteredUsers[start:end], nil
 }
 
-func (s *userService) CreateUser(user models.User) (models.User, error) {
-	if _, found := s.repo.FindByEmail(user.Email); found {
-		return models.User{}, ErrEmailExists
+func (us *userService) CreateUser(user models.User) (models.User, error) {
+	user.Email = utils.NormalizeString(user.Email)
+
+	if _, exist := us.repo.FindByEmail(user.Email); exist {
+		return models.User{}, utils.NewError("email already exist", utils.ErrCodeConflict)
 	}
 
-	if user.UUID == "" {
-		uuid, err := newUUID()
+	user.UUID = uuid.New().String()
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return models.User{}, utils.WrapError(err, "faild to hash password", utils.ErrCodeInternal)
+	}
+
+	user.Password = string(hashedPassword)
+
+	if err := us.repo.Create(user); err != nil {
+		return models.User{}, utils.WrapError(err, "faild to create user", utils.ErrCodeInternal)
+	}
+
+	return user, nil
+}
+
+func (us *userService) GetUserByUUID(uuid string) (models.User, error) {
+	user, found := us.repo.FindByUUID(uuid)
+	if !found {
+		return models.User{}, utils.NewError("user not found", utils.ErrCodeNotFound)
+	}
+
+	return user, nil
+}
+
+func (us *userService) UpdateUser(uuid string, updatedUser models.User) (models.User, error) {
+	updatedUser.Email = utils.NormalizeString(updatedUser.Email)
+
+	if u, exist := us.repo.FindByEmail(updatedUser.Email); exist && u.UUID != uuid {
+		return models.User{}, utils.NewError("email already exist", utils.ErrCodeConflict)
+	}
+
+	currentUser, found := us.repo.FindByUUID(uuid)
+	if !found {
+		return models.User{}, utils.NewError("user not found", utils.ErrCodeNotFound)
+	}
+
+	currentUser.Name = updatedUser.Name
+	currentUser.Email = updatedUser.Email
+	currentUser.Age = updatedUser.Age
+	currentUser.Status = updatedUser.Status
+	currentUser.Level = updatedUser.Level
+
+	if updatedUser.Password != "" {
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(updatedUser.Password), bcrypt.DefaultCost)
 		if err != nil {
-			return models.User{}, err
+			return models.User{}, utils.WrapError(err, "faild to hash password", utils.ErrCodeInternal)
 		}
-		user.UUID = uuid
+
+		currentUser.Password = string(hashedPassword)
 	}
 
-	if err := s.repo.Create(user); err != nil {
-		return models.User{}, err
+	if err := us.repo.Update(uuid, currentUser); err != nil {
+		return models.User{}, utils.WrapError(err, "faild to update user", utils.ErrCodeInternal)
 	}
 
-	return user, nil
+	return currentUser, nil
 }
 
-func (s *userService) GetUserByUUID(uuid string) (models.User, error) {
-	user, found := s.repo.FindByUUID(uuid)
-	if !found {
-		return models.User{}, ErrUserNotFound
-	}
-	return user, nil
-}
-
-func (s *userService) UpdateUser(uuid string, user models.User) (models.User, error) {
-	existing, found := s.repo.FindByUUID(uuid)
-	if !found {
-		return models.User{}, ErrUserNotFound
+func (us *userService) DeleteUser(uuid string) error {
+	if err := us.repo.Delete(uuid); err != nil {
+		return utils.WrapError(err, "faild to hash password", utils.ErrCodeInternal)
 	}
 
-	if user.Email != "" && user.Email != existing.Email {
-		if _, taken := s.repo.FindByEmail(user.Email); taken {
-			return models.User{}, ErrEmailExists
-		}
-		existing.Email = user.Email
-	}
-
-	if user.Name != "" {
-		existing.Name = user.Name
-	}
-	if user.Age > 0 {
-		existing.Age = user.Age
-	}
-	if user.Password != "" {
-		existing.Password = user.Password
-	}
-	if user.Status > 0 {
-		existing.Status = user.Status
-	}
-	if user.Level > 0 {
-		existing.Level = user.Level
-	}
-
-	if err := s.repo.Update(uuid, existing); err != nil {
-		return models.User{}, err
-	}
-
-	return existing, nil
-}
-
-func (s *userService) DeleteUser(uuid string) error {
-	if _, found := s.repo.FindByUUID(uuid); !found {
-		return ErrUserNotFound
-	}
-	return s.repo.Delete(uuid)
-}
-
-// newUUID tạo UUID v4 bằng crypto/rand để khỏi thêm dependency mới.
-func newUUID() (string, error) {
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	b[6] = (b[6] & 0x0f) | 0x40 // version 4
-	b[8] = (b[8] & 0x3f) | 0x80 // variant 10
-
-	return strings.Join([]string{
-		hex.EncodeToString(b[0:4]),
-		hex.EncodeToString(b[4:6]),
-		hex.EncodeToString(b[6:8]),
-		hex.EncodeToString(b[8:10]),
-		hex.EncodeToString(b[10:16]),
-	}, "-"), nil
+	return nil
 }
