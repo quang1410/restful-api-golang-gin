@@ -1,0 +1,21 @@
+version: '3.8' # version cú pháp docker compose
+
+services:
+  db:
+    image: postgres:17.5-alpine3.22 # image muốn sử dụng
+    container_name: postgres-db # tên container
+    restart: unless-stopped # container sẽ tự khởi động lại nếu gặp lỗi, trừ khi bị dừng thủ công
+
+    environment:
+      POSTGRES_DB: master-golang # tạo database mặc định với tên khai báo
+      POSTGRES_USER: root # tạo username của database
+      POSTGRES_PASSWORD: root # tạo password cho người dùng root
+
+    ports:
+      - "5432:5432" # host_port(Docker Host) : container_port(PostgreSQL)
+
+    volumes:
+      - pgdata:/var/lib/postgresql/data # gắn volume pgdata vào /var/lib/postgresql/data trong container
+
+volumes:
+  pgdata: # khai báo và khởi tạo volume để lưu dữ liệu cho PostgreSQL
