@@ -1,10 +1,16 @@
 package app
 
 import (
+	"context"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
 	"project-shopping-cart/internal/config"
 	"project-shopping-cart/internal/routes"
 	"project-shopping-cart/internal/validation"
+	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -40,7 +46,34 @@ func NewApplication(cfg *config.Config) *Application {
 }
 
 func (a *Application) Run() error {
-	return a.router.Run(a.config.ServerAddress)
+	srv := &http.Server{
+		Addr:    a.config.ServerAddress,
+		Handler: a.router,
+	}
+
+	quit := make(chan os.Signal, 1)
+	// SIGINT: Ctrl+C, SIGTERM: termination signal, SIGHUP: terminal closed
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+
+	go func() {
+		log.Printf("Server is running at %s\n", a.config.ServerAddress)
+		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+			log.Fatalf("Failed to start server: %s\n", err)
+		}
+	}()
+
+	<-quit
+	log.Println("Shutting down signal received, exiting...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("Server forced to shutdown: %s\n", err)
+	}
+
+	log.Println("Server exited gracefully")
+	return nil
 }
 
 func getModulRoutes(modules []Module) []routes.Route {
