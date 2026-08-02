@@ -2,6 +2,7 @@ package routes
 
 import (
 	"project-shopping-cart/internal/middleware"
+	"project-shopping-cart/internal/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -11,12 +12,18 @@ type Route interface {
 }
 
 func RegisterRoutes(r *gin.Engine, routes ...Route) {
+
+	httpLogger := utils.NewLoggerWithPath("http.log", "info")
+	recoveryLogger := utils.NewLoggerWithPath("recovery.log", "warning")
+	rateLimterLogger := utils.NewLoggerWithPath("rate_limiter.log", "warning")
+
 	r.Use(
-		middleware.LoggerMiddleware(),
+		middleware.LoggerMiddleware(httpLogger),
+		middleware.RecoveryMiddleware(recoveryLogger),
 		middleware.ApiKeyMiddleware(),
 		middleware.AuthMiddleware(),
-		middleware.RateLimiterMiddleware(),
-	)
+		middleware.RateLimiterMiddleware(rateLimterLogger),
+)
 
 	v1api := r.Group("/api/v1")
 

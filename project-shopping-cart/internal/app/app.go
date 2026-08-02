@@ -7,8 +7,11 @@ import (
 	"os"
 	"os/signal"
 	"project-shopping-cart/internal/config"
+	"project-shopping-cart/internal/db"
+	"project-shopping-cart/internal/db/sqlc"
 	"project-shopping-cart/internal/routes"
 	"project-shopping-cart/internal/validation"
+	"project-shopping-cart/pkg/logger"
 	"syscall"
 	"time"
 
@@ -25,6 +28,10 @@ type Application struct {
 	modules []Module
 }
 
+type ModuleContext struct {
+	DB    sqlc.Querier
+}
+
 func NewApplication(cfg *config.Config) *Application {
 	if err := validation.InitValidator(); err != nil {
 		log.Fatalf("Validator init failed %v", err)
@@ -32,8 +39,16 @@ func NewApplication(cfg *config.Config) *Application {
 
 	r := gin.Default()
 
+	if err := db.InitDB(); err != nil {
+		logger.Log.Fatal().Err(err).Msg("Database init failed")
+	}
+
+	ctx := &ModuleContext{
+		DB:    db.DB,
+	}
+
 	modules := []Module{
-		NewUserModule(),
+		NewUserModule(ctx),
 	}
 
 	routes.RegisterRoutes(r, getModulRoutes(modules)...)

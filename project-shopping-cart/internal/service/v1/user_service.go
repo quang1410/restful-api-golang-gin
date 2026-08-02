@@ -1,7 +1,14 @@
 package v1service
 
 import (
+	"errors"
+	"project-shopping-cart/internal/db/sqlc"
 	"project-shopping-cart/internal/repository"
+	"project-shopping-cart/internal/utils"
+
+	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgconn"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type userService struct {
@@ -16,7 +23,35 @@ func NewUserService(repo repository.UserRepository) UserService {
 
 func (us *userService) GetAllUsers(search string, page, limit int) {}
 
-func (us *userService) CreateUser() {}
+func (us *userService) CreateUser(ctx *gin.Context, input sqlc.CreateUserParams) (sqlc.User, error) {
+	context := ctx.Request.Context()
+
+	input.UserEmail = utils.NormalizeString(input.UserEmail)
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.UserPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return sqlc.User{}, utils.WrapError(err, "failed to hash password", utils.ErrCodeInternal)
+	}
+
+	input.UserPassword = string(hashedPassword)
+
+	user, err := us.repo.Create(context, input)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return sqlc.User{}, utils.NewError("email already exist", utils.ErrCodeConflict)
+		}
+
+		return sqlc.User{}, utils.WrapError(err, "failed to create a new user", utils.ErrCodeInternal)
+	}
+
+	// Clear cache redis
+	// if err := us.cache.Clear("users:*"); err != nil {
+	// 	logger.Log.Warn().Err(err).Msg("Failed to clear cache")
+	// }
+
+	return user, nil
+}
 
 func (us *userService) GetUserByUUID(uuid string) {}
 
