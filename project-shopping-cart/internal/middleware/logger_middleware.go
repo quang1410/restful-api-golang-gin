@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"project-shopping-cart/pkg/logger"
 	"strings"
 	"time"
 
@@ -23,7 +24,7 @@ func (w *CustomResponseWriter) Write(data []byte) (n int, err error) {
 	return w.ResponseWriter.Write(data)
 }
 
-func LoggerMiddleware(logger *zerolog.Logger) gin.HandlerFunc {
+func LoggerMiddleware(zeroLogger *zerolog.Logger) gin.HandlerFunc {
 
 	return func(ctx *gin.Context) {
 		start := time.Now()
@@ -63,7 +64,7 @@ func LoggerMiddleware(logger *zerolog.Logger) gin.HandlerFunc {
 		} else {
 			bodyBytes, err := io.ReadAll(ctx.Request.Body)
 			if err != nil {
-				logger.Error().Err(err).Msg("Failed to read request body")
+				zeroLogger.Error().Err(err).Msg("Failed to read request body")
 			}
 
 			ctx.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
@@ -114,14 +115,15 @@ func LoggerMiddleware(logger *zerolog.Logger) gin.HandlerFunc {
 			responseBodyParsed = responseBodyRaw
 		}
 
-		logEvent := logger.Info()
+		logEvent := zeroLogger.Info()
 		if statusCode >= 500 {
-			logEvent = logger.Error()
+			logEvent = zeroLogger.Error()
 		} else if statusCode >= 400 {
-			logEvent = logger.Warn()
+			logEvent = zeroLogger.Warn()
 		}
 
 		logEvent.
+			Str("trace_id", logger.GetTraceID(ctx.Request.Context())).
 			Str("method", ctx.Request.Method).
 			Str("path", ctx.Request.URL.Path).
 			Str("query", ctx.Request.URL.RawQuery).
