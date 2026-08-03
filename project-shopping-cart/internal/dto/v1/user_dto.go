@@ -3,6 +3,8 @@ package v1dto
 import (
 	"project-shopping-cart/internal/db/sqlc"
 	"project-shopping-cart/internal/utils"
+
+	"github.com/google/uuid"
 )
 
 type UserDTO struct {
@@ -53,6 +55,18 @@ func (input *CreateUserInput) MapCreateInputToModel() sqlc.CreateUserParams {
 		UserStatus:   input.Status,
 		UserLevel:    input.Level,
 	}
+}
+
+func (input *UpdateUserInput) MapUpdateInputToModel(userUuid uuid.UUID) sqlc.UpdateUserParams {
+	return sqlc.UpdateUserParams{
+		UserPassword: input.Password,
+		UserFullname: input.Name,
+		UserAge:      input.Age,
+		UserStatus:   input.Status,
+		UserLevel:    input.Level,
+		UserUuid:     userUuid,
+	}
+
 }
 
 func MapUserToDTO(user sqlc.User) *UserDTO {

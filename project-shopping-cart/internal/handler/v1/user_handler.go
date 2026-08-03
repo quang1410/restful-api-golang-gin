@@ -9,6 +9,7 @@ import (
 	"project-shopping-cart/internal/validation"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type UserHandler struct {
@@ -80,9 +81,15 @@ func (uh *UserHandler) GetUserByUUID(ctx *gin.Context) {
 }
 
 func (uh *UserHandler) UpdateUser(ctx *gin.Context) {
-	var params GetUserByUuidParam
+	var params v1dto.GetUserByUuidParam
 	if err := ctx.ShouldBindUri(&params); err != nil {
 		utils.ResponseValidator(ctx, validation.HandleValidationErrors(err))
+		return
+	}
+
+	userUuid, err := uuid.Parse(params.Uuid)
+	if err != nil {
+		utils.ResponseError(ctx, err)
 		return
 	}
 
@@ -92,7 +99,17 @@ func (uh *UserHandler) UpdateUser(ctx *gin.Context) {
 		return
 	}
 
-	utils.ResponseSuccess(ctx, http.StatusOK, "")
+	user := input.MapUpdateInputToModel(userUuid)
+
+	updatedUser, err := uh.service.UpdateUser(ctx, user)
+	if err != nil {
+		utils.ResponseError(ctx, err)
+		return
+	}
+
+	userDTO := v1dto.MapUserToDTO(updatedUser)
+
+	utils.ResponseSuccess(ctx, http.StatusOK, "User updated successfully", userDTO)
 }
 
 func (uh *UserHandler) DeleteUser(ctx *gin.Context) {
