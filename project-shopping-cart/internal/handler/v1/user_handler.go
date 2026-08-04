@@ -1,7 +1,6 @@
 package v1handler
 
 import (
-	"fmt"
 	"net/http"
 	v1dto "project-shopping-cart/internal/dto/v1"
 	v1service "project-shopping-cart/internal/service/v1"
@@ -112,17 +111,72 @@ func (uh *UserHandler) UpdateUser(ctx *gin.Context) {
 	utils.ResponseSuccess(ctx, http.StatusOK, "User updated successfully", userDTO)
 }
 
-func (uh *UserHandler) DeleteUser(ctx *gin.Context) {
-	var params GetUserByUuidParam
+func (uh *UserHandler) SoftDeleteUser(ctx *gin.Context) {
+	var params v1dto.GetUserByUuidParam
 	if err := ctx.ShouldBindUri(&params); err != nil {
 		utils.ResponseValidator(ctx, validation.HandleValidationErrors(err))
 		return
 	}
 
-	utils.ResponseStatusCode(ctx, http.StatusNoContent)
+	userUuid, err := uuid.Parse(params.Uuid)
+	if err != nil {
+		utils.ResponseError(ctx, err)
+		return
+	}
+
+	softDeleteUser, err := uh.service.SoftDeleteUser(ctx, userUuid)
+	if err != nil {
+		utils.ResponseError(ctx, err)
+		return
+	}
+
+	userDTO := v1dto.MapUserToDTO(softDeleteUser)
+
+	utils.ResponseSuccess(ctx, http.StatusOK, "User deleted successfully", userDTO)
 }
 
-func (uh *UserHandler) PanicHandler(ctx *gin.Context) {
-	var a []int
-	fmt.Println(a[1]) // This will cause a panic
+func (uh *UserHandler) RestoreUser(ctx *gin.Context) {
+	var params v1dto.GetUserByUuidParam
+	if err := ctx.ShouldBindUri(&params); err != nil {
+		utils.ResponseValidator(ctx, validation.HandleValidationErrors(err))
+		return
+	}
+
+	userUuid, err := uuid.Parse(params.Uuid)
+	if err != nil {
+		utils.ResponseError(ctx, err)
+		return
+	}
+
+	softDeleteUser, err := uh.service.RestoreUser(ctx, userUuid)
+	if err != nil {
+		utils.ResponseError(ctx, err)
+		return
+	}
+
+	userDTO := v1dto.MapUserToDTO(softDeleteUser)
+
+	utils.ResponseSuccess(ctx, http.StatusOK, "Restore user successfully", userDTO)
+}
+
+func (uh *UserHandler) DeleteUser(ctx *gin.Context) {
+	var params v1dto.GetUserByUuidParam
+	if err := ctx.ShouldBindUri(&params); err != nil {
+		utils.ResponseValidator(ctx, validation.HandleValidationErrors(err))
+		return
+	}
+
+	userUuid, err := uuid.Parse(params.Uuid)
+	if err != nil {
+		utils.ResponseError(ctx, err)
+		return
+	}
+
+	err = uh.service.DeleteUser(ctx, userUuid)
+	if err != nil {
+		utils.ResponseError(ctx, err)
+		return
+	}
+
+	utils.ResponseStatusCode(ctx, http.StatusNoContent)
 }

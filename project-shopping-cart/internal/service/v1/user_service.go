@@ -8,6 +8,7 @@ import (
 	"project-shopping-cart/internal/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -86,4 +87,62 @@ func (us *userService) UpdateUser(ctx *gin.Context, input sqlc.UpdateUserParams)
 	return updatedUser, nil
 }
 
-func (us *userService) DeleteUser(uuid string) {}
+func (us *userService) SoftDeleteUser(ctx *gin.Context, uuid uuid.UUID) (sqlc.User, error) {
+	context := ctx.Request.Context()
+
+	softDeleteUser, err := us.repo.SoftDelete(context, uuid)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return sqlc.User{}, utils.NewError("user not found", utils.ErrCodeNotFound)
+		}
+
+		return sqlc.User{}, utils.WrapError(err, "failed to delete user", utils.ErrCodeInternal)
+	}
+
+	// Clear cache redis
+	// if err := us.cache.Clear("users:*"); err != nil {
+	// 	logger.Log.Warn().Err(err).Msg("Failed to clear cache")
+	// }
+
+	return softDeleteUser, nil
+}
+
+func (us *userService) RestoreUser(ctx *gin.Context, uuid uuid.UUID) (sqlc.User, error) {
+	context := ctx.Request.Context()
+
+	restoreUser, err := us.repo.Restore(context, uuid)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return sqlc.User{}, utils.NewError("user not found or not marked as delete for restore", utils.ErrCodeNotFound)
+		}
+
+		return sqlc.User{}, utils.WrapError(err, "failed to restore user", utils.ErrCodeInternal)
+	}
+
+	// Clear cache redis
+	// if err := us.cache.Clear("users:*"); err != nil {
+	// 	logger.Log.Warn().Err(err).Msg("Failed to clear cache")
+	// }
+
+	return restoreUser, nil
+}
+
+func (us *userService) DeleteUser(ctx *gin.Context, uuid uuid.UUID) error {
+	context := ctx.Request.Context()
+
+	_, err := us.repo.Delete(context, uuid)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return utils.NewError("user not found or not marked as delete for permenent removal", utils.ErrCodeNotFound)
+		}
+
+		return utils.WrapError(err, "failed to restore user", utils.ErrCodeInternal)
+	}
+
+	// Clear cache redis
+	// if err := us.cache.Clear("users:*"); err != nil {
+	// 	logger.Log.Warn().Err(err).Msg("Failed to clear cache")
+	// }
+
+	return nil
+}
