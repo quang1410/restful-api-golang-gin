@@ -66,6 +66,14 @@ migrate-goto:
 sqlc:
 	sqlc generate
 
+# Seed 100 user active + 10 user soft deleted (chạy lại được nhiều lần)
+seed:
+	docker exec -i postgres-db psql -U $(DB_USER) -d $(DB_NAME) < ./internal/db/seeds/users_seed.sql
 
-.PHONY: run build clean tidy test importdb exportdb server migrate-create migrate-up migrate-down migrate-force migrate-drop migrate-goto migrate-down-n sqlc
+# Xoá toàn bộ dữ liệu seed
+seed-clean:
+	docker exec -i postgres-db psql -U $(DB_USER) -d $(DB_NAME) -c "DELETE FROM users WHERE user_email LIKE '%@example.com';"
+
+
+.PHONY: run build clean tidy test importdb exportdb server migrate-create migrate-up migrate-down migrate-force migrate-drop migrate-goto migrate-down-n sqlc seed seed-clean
 

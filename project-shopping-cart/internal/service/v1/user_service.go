@@ -23,7 +23,62 @@ func NewUserService(repo repository.UserRepository) UserService {
 	}
 }
 
-func (us *userService) GetAllUsers(search string, page, limit int) {}
+func (us *userService) GetAllUsers(ctx *gin.Context, search, orderBy, sort string, page, limit int32, deleted bool) ([]sqlc.User, int32, error) {
+	context := ctx.Request.Context()
+
+	/** Get Cache Redis **/
+	// cacheKey := us.generateCacheKey(search, orderBy, sort, page, limit, deleted)
+
+	// var cacheData struct {
+	// 	Users []sqlc.User `json:"users"`
+	// 	Total int32       `json:"total"`
+	// }
+
+	// if err := us.cache.Get(cacheKey, &cacheData); err == nil && cacheData.Users != nil {
+	// 	return cacheData.Users, cacheData.Total, nil
+	// }
+
+	if sort == "" {
+		sort = "desc"
+	}
+
+	if orderBy == "" {
+		orderBy = "user_created_at"
+	}
+
+	if page <= 0 {
+		page = 1
+	}
+
+	if limit <= 0 {
+		limitInt := utils.GetIntEnv("LIMIT_ITEM_ON_PER_PAGE", 10)
+		limit = int32(limitInt)
+	}
+
+	offset := (page - 1) * limit
+
+	users, err := us.repo.GetAll(context, search, orderBy, sort, limit, offset)
+	if err != nil {
+		return []sqlc.User{}, 0, utils.WrapError(err, "failed to fetch users", utils.ErrCodeInternal)
+	}
+
+	total, err := us.repo.CountUsers(context, search, deleted)
+	if err != nil {
+		return []sqlc.User{}, 0, utils.WrapError(err, "failed to count users", utils.ErrCodeInternal)
+	}
+
+	// Create cache data
+	// cacheData = struct {
+	// 	Users []sqlc.User `json:"users"`
+	// 	Total int32       `json:"total"`
+	// }{
+	// 	Users: users,
+	// 	Total: int32(total),
+	// }
+	// us.cache.Set(cacheKey, cacheData, 10*time.Minute)
+
+	return users, int32(total), nil
+}
 
 func (us *userService) CreateUser(ctx *gin.Context, input sqlc.CreateUserParams) (sqlc.User, error) {
 	context := ctx.Request.Context()

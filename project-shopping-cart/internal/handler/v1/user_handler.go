@@ -32,21 +32,23 @@ type GetUsersParams struct {
 }
 
 func (uh *UserHandler) GetAllUsers(ctx *gin.Context) {
-	var params GetUsersParams
+	var params v1dto.GetUsersParams
 	if err := ctx.ShouldBindQuery(&params); err != nil {
 		utils.ResponseValidator(ctx, validation.HandleValidationErrors(err))
 		return
 	}
 
-	if params.Page == 0 {
-		params.Page = 1
+	users, total, err := uh.service.GetAllUsers(ctx, params.Search, params.Order, params.Sort, params.Page, params.Limit, false)
+	if err != nil {
+		utils.ResponseError(ctx, err)
+		return
 	}
 
-	if params.Limit == 0 {
-		params.Limit = 10
-	}
+	usersDTO := v1dto.MapUsersToDTO(users)
 
-	utils.ResponseSuccess(ctx, http.StatusOK, "")
+	paginationResp := utils.NewPagiantionResponse(usersDTO, params.Page, params.Limit, total)
+
+	utils.ResponseSuccess(ctx, http.StatusOK, "User list successfully", paginationResp)
 }
 
 func (uh *UserHandler) CreateUser(ctx *gin.Context) {
