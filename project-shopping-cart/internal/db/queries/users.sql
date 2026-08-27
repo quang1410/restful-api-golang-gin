@@ -114,3 +114,8 @@ AND (
 )
 ORDER BY user_created_at DESC
 LIMIT $1 OFFSET $2;
+
+-- name: GetUser :one
+SELECT * FROM users
+WHERE user_deleted_at IS NULL
+AND user_uuid = $1;
