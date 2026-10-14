@@ -3,23 +3,31 @@ package v1service
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"project-shopping-cart/internal/db/sqlc"
 	"project-shopping-cart/internal/repository"
 	"project-shopping-cart/internal/utils"
+	"project-shopping-cart/pkg/cache"
+	"project-shopping-cart/pkg/logger"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type userService struct {
 	repo repository.UserRepository
+	cache cache.RedisCacheService
 }
 
-func NewUserService(repo repository.UserRepository) UserService {
+func NewUserService(repo repository.UserRepository, redisClient *redis.Client) UserService {
 	return &userService{
 		repo: repo,
+		cache: cache.NewRedisCacheService(redisClient),
 	}
 }
 
@@ -27,16 +35,16 @@ func (us *userService) GetAllUsers(ctx *gin.Context, search, orderBy, sort strin
 	context := ctx.Request.Context()
 
 	/** Get Cache Redis **/
-	// cacheKey := us.generateCacheKey(search, orderBy, sort, page, limit, deleted)
+	cacheKey := us.generateCacheKey(search, orderBy, sort, page, limit, deleted)
 
-	// var cacheData struct {
-	// 	Users []sqlc.User `json:"users"`
-	// 	Total int32       `json:"total"`
-	// }
+	var cacheData struct {
+		Users []sqlc.User `json:"users"`
+		Total int32       `json:"total"`
+	}
 
-	// if err := us.cache.Get(cacheKey, &cacheData); err == nil && cacheData.Users != nil {
-	// 	return cacheData.Users, cacheData.Total, nil
-	// }
+	if err := us.cache.Get(cacheKey, &cacheData); err == nil && cacheData.Users != nil {
+		return cacheData.Users, cacheData.Total, nil
+	}
 
 	if sort == "" {
 		sort = "desc"
@@ -69,14 +77,14 @@ func (us *userService) GetAllUsers(ctx *gin.Context, search, orderBy, sort strin
 	}
 
 	// Create cache data
-	// cacheData = struct {
-	// 	Users []sqlc.User `json:"users"`
-	// 	Total int32       `json:"total"`
-	// }{
-	// 	Users: users,
-	// 	Total: int32(total),
-	// }
-	// us.cache.Set(cacheKey, cacheData, 10*time.Minute)
+	cacheData = struct {
+		Users []sqlc.User `json:"users"`
+		Total int32       `json:"total"`
+	}{
+		Users: users,
+		Total: int32(total),
+	}
+	us.cache.Set(cacheKey, cacheData, 10*time.Minute)
 
 	return users, int32(total), nil
 }
@@ -104,9 +112,9 @@ func (us *userService) CreateUser(ctx *gin.Context, input sqlc.CreateUserParams)
 	}
 
 	// Clear cache redis
-	// if err := us.cache.Clear("users:*"); err != nil {
-	// 	logger.Log.Warn().Err(err).Msg("Failed to clear cache")
-	// }
+	if err := us.cache.Clear("users:*"); err != nil {
+		logger.Log.Warn().Err(err).Msg("Failed to clear cache")
+	}
 
 	return user, nil
 }
@@ -149,9 +157,9 @@ func (us *userService) UpdateUser(ctx *gin.Context, input sqlc.UpdateUserParams)
 	}
 
 	// Clear cache redis
-	// if err := us.cache.Clear("users:*"); err != nil {
-	// 	logger.Log.Warn().Err(err).Msg("Failed to clear cache")
-	// }
+	if err := us.cache.Clear("users:*"); err != nil {
+		logger.Log.Warn().Err(err).Msg("Failed to clear cache")
+	}
 
 	return updatedUser, nil
 }
@@ -169,9 +177,9 @@ func (us *userService) SoftDeleteUser(ctx *gin.Context, uuid uuid.UUID) (sqlc.Us
 	}
 
 	// Clear cache redis
-	// if err := us.cache.Clear("users:*"); err != nil {
-	// 	logger.Log.Warn().Err(err).Msg("Failed to clear cache")
-	// }
+	if err := us.cache.Clear("users:*"); err != nil {
+		logger.Log.Warn().Err(err).Msg("Failed to clear cache")
+	}
 
 	return softDeleteUser, nil
 }
@@ -189,9 +197,9 @@ func (us *userService) RestoreUser(ctx *gin.Context, uuid uuid.UUID) (sqlc.User,
 	}
 
 	// Clear cache redis
-	// if err := us.cache.Clear("users:*"); err != nil {
-	// 	logger.Log.Warn().Err(err).Msg("Failed to clear cache")
-	// }
+	if err := us.cache.Clear("users:*"); err != nil {
+		logger.Log.Warn().Err(err).Msg("Failed to clear cache")
+	}
 
 	return restoreUser, nil
 }
@@ -209,9 +217,28 @@ func (us *userService) DeleteUser(ctx *gin.Context, uuid uuid.UUID) error {
 	}
 
 	// Clear cache redis
-	// if err := us.cache.Clear("users:*"); err != nil {
-	// 	logger.Log.Warn().Err(err).Msg("Failed to clear cache")
-	// }
+	if err := us.cache.Clear("users:*"); err != nil {
+		logger.Log.Warn().Err(err).Msg("Failed to clear cache")
+	}
 
 	return nil
+}
+
+func (us *userService) generateCacheKey(search, orderBy, sort string, page, limit int32, deleted bool) string {
+	search = strings.TrimSpace(search)
+	if search == "" {
+		search = "none"
+	}
+
+	orderBy = strings.TrimSpace(orderBy)
+	if orderBy == "" {
+		orderBy = "user_created_at"
+	}
+
+	sort = strings.ToLower(strings.TrimSpace(sort))
+	if sort == "" {
+		sort = "desc"
+	}
+
+	return fmt.Sprintf("users:%s:%s:%s:%d:%d:%t", search, orderBy, sort, page, limit, deleted)
 }

@@ -4,6 +4,7 @@ import (
 	"project-shopping-cart/internal/middleware"
 	"project-shopping-cart/internal/utils"
 
+	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,6 +17,8 @@ func RegisterRoutes(r *gin.Engine, routes ...Route) {
 	httpLogger := utils.NewLoggerWithPath("http.log", "info")
 	recoveryLogger := utils.NewLoggerWithPath("recovery.log", "warning")
 	rateLimterLogger := utils.NewLoggerWithPath("rate_limiter.log", "warning")
+
+	r.Use(gzip.Gzip(gzip.DefaultCompression))
 
 	r.Use(
 		middleware.LoggerMiddleware(httpLogger),

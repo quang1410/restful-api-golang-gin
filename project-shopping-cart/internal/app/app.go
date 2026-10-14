@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 )
 
 type Module interface {
@@ -30,6 +31,7 @@ type Application struct {
 
 type ModuleContext struct {
 	DB    sqlc.Querier
+	Redis *redis.Client
 }
 
 func NewApplication(cfg *config.Config) *Application {
@@ -43,8 +45,11 @@ func NewApplication(cfg *config.Config) *Application {
 		logger.Log.Fatal().Err(err).Msg("Database init failed")
 	}
 
+	redisClient := config.NewRedisClient()
+
 	ctx := &ModuleContext{
 		DB:    db.DB,
+		Redis: redisClient,
 	}
 
 	modules := []Module{
